@@ -7,7 +7,6 @@ import {
   CloudSnow, 
   Wind, 
   Sun, 
-  Snowflake,
   Thermometer
 } from "lucide-react";
 
@@ -23,9 +22,10 @@ interface WeatherData {
 interface WeatherDisplayProps {
   weather: WeatherData;
   recommendations?: string[];
+  hideLocation?: boolean;
 }
 
-export default function WeatherDisplay({ weather, recommendations }: WeatherDisplayProps) {
+export default function WeatherDisplay({ weather, recommendations, hideLocation = false }: WeatherDisplayProps) {
   const getWeatherIcon = (icon: string) => {
     switch (icon) {
       case 'sunny':
@@ -43,9 +43,6 @@ export default function WeatherDisplay({ weather, recommendations }: WeatherDisp
     }
   };
 
-  // Extract the base location name without the emoji
-  const locationName = weather.location.split(' ')[0];
-
   return (
     <motion.div 
       className="space-y-4"
@@ -53,23 +50,25 @@ export default function WeatherDisplay({ weather, recommendations }: WeatherDisp
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-        <motion.div 
-          className="flex items-center"
-          initial={{ scale: 0.9 }}
-          animate={{ scale: 1 }}
-          transition={{ duration: 0.3 }}
-        >
+      <motion.div 
+        className="flex flex-col sm:flex-row items-start sm:items-center justify-between"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+      >
+        <div className="flex items-center">
           {getWeatherIcon(weather.icon)}
           <div className="ml-3">
-            <motion.h3 
-              className="text-xl font-bold"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.2 }}
-            >
-              {locationName}
-            </motion.h3>
+            {!hideLocation && (
+              <motion.h3 
+                className="text-xl font-bold"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                {weather.location.split(' ')[0]}
+              </motion.h3>
+            )}
             <motion.p 
               className="text-2xl font-semibold"
               initial={{ opacity: 0 }}
@@ -87,7 +86,7 @@ export default function WeatherDisplay({ weather, recommendations }: WeatherDisp
               {weather.condition}
             </motion.p>
           </div>
-        </motion.div>
+        </div>
         <motion.div 
           className="mt-4 sm:mt-0 grid grid-cols-2 gap-3"
           initial={{ opacity: 0, x: 20 }}
@@ -103,7 +102,7 @@ export default function WeatherDisplay({ weather, recommendations }: WeatherDisp
             <span className="text-sm">Wind: {weather.windSpeed} km/h</span>
           </div>
         </motion.div>
-      </div>
+      </motion.div>
 
       {recommendations && recommendations.length > 0 && (
         <motion.div 
