@@ -29,13 +29,14 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { User, Settings, Bell, Moon, Sun, LogOut, Upload } from "lucide-react";
+import { motion } from "framer-motion";
 
 // Profile form schema
 const profileFormSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters").max(30),
   name: z.string().optional(),
-  email: z.string().email().optional().or(z.literal("")),
-  username: z.string().min(3).max(30),
-  profilePicture: z.string().url().optional().or(z.literal("")),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  profilePicture: z.string().url("Invalid URL").optional().or(z.literal("")),
 });
 
 // Settings form schema
@@ -51,35 +52,36 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>;
 type SettingsFormValues = z.infer<typeof settingsFormSchema>;
 
 export default function ProfilePage() {
-  const { user, isLoading, updateUserMutation, logoutMutation } = useAuth();
+  const { user, updateUserMutation, logoutMutation } = useAuth();
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("profile");
+  const [isUploading, setIsUploading] = useState(false);
 
   // Profile form
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
+      username: user?.username || "",
       name: user?.name || "",
       email: user?.email || "",
-      username: user?.username || "",
       profilePicture: user?.profilePicture || "",
     },
   });
 
-  // Reset form when user data changes (e.g., after login)
+  // Reset form when user data changes
   useEffect(() => {
     if (user) {
       profileForm.reset({
+        username: user.username || "",
         name: user.name || "",
         email: user.email || "",
-        username: user.username || "",
         profilePicture: user.profilePicture || "",
       });
     }
   }, [user, profileForm]);
 
-  // Settings form with default values
+  // Settings form
   const settingsForm = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsFormSchema),
     defaultValues: {
@@ -94,17 +96,21 @@ export default function ProfilePage() {
   // Handle profile form submission
   const onProfileSubmit = async (data: ProfileFormValues) => {
     try {
-      // Remove undefined values to prevent overwriting with undefined
-      const filteredData = Object.fromEntries(
-        Object.entries(data).filter(([_, v]) => v !== undefined && v !== "")
+      // Remove empty strings to prevent overwriting with empty values
+      const updatedData = Object.fromEntries(
+        Object.entries(data).filter(([_, v]) => v !== "")
       );
 
-      // Call the update mutation with filtered data
-      updateUserMutation.mutate(filteredData);
+      await updateUserMutation.mutateAsync(updatedData);
+
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update profile. Please try again.",
+        description: error instanceof Error ? error.message : "Failed to update profile",
         variant: "destructive",
       });
     }
@@ -113,39 +119,60 @@ export default function ProfilePage() {
   // Handle settings form submission
   const onSettingsSubmit = async (data: SettingsFormValues) => {
     try {
-      // Apply dark mode setting
       setTheme(data.darkMode ? "dark" : "light");
 
       toast({
-        title: "Settings updated",
-        description: "Your settings have been updated successfully.",
+        title: "Success",
+        description: "Settings updated successfully",
       });
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to update settings. Please try again.",
+        description: "Failed to update settings",
         variant: "destructive",
       });
     }
   };
 
   // Handle logout
-  const handleLogout = () => {
-    logoutMutation.mutate(undefined, {
-      onSuccess: () => {
-        window.location.href = "/auth";
-      },
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: "Failed to log out. Please try again.",
-          variant: "destructive",
-        });
-      },
-    });
+  const handleLogout = async () => {
+    try {
+      await logoutMutation.mutateAsync();
+      window.location.href = "/auth";
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to log out",
+        variant: "destructive",
+      });
+    }
   };
 
-  if (isLoading) {
+  // Handle file upload
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsUploading(true);
+      // For demo purposes, we're just using FileReader to get a data URL
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        profileForm.setValue("profilePicture", reader.result as string);
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      setIsUploading(false);
+      toast({
+        title: "Error",
+        description: "Failed to upload image",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (!user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -159,7 +186,14 @@ export default function ProfilePage() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent">Profile & Settings</h1>
+          <motion.h1 
+            className="text-3xl font-bold mb-6 bg-gradient-to-r from-primary to-purple-500 bg-clip-text text-transparent"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            Profile & Settings
+          </motion.h1>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-2">
@@ -173,7 +207,6 @@ export default function ProfilePage() {
               </TabsTrigger>
             </TabsList>
 
-            {/* Profile Tab */}
             <TabsContent value="profile">
               <Card>
                 <CardHeader>
@@ -186,19 +219,24 @@ export default function ProfilePage() {
                   <Form {...profileForm}>
                     <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
                       <div className="flex items-center space-x-4 mb-6">
-                        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white">
-                          {user?.profilePicture ? (
+                        <div className="relative h-20 w-20 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white overflow-hidden">
+                          {profileForm.watch("profilePicture") ? (
                             <img
-                              src={user.profilePicture}
+                              src={profileForm.watch("profilePicture")}
                               alt={user.name || user.username}
-                              className="h-full w-full rounded-full object-cover"
+                              className="h-full w-full object-cover"
                             />
                           ) : (
                             <User className="h-10 w-10" />
                           )}
+                          {isUploading && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                            </div>
+                          )}
                         </div>
                         <div>
-                          <h3 className="font-medium">{user?.name || user?.username}</h3>
+                          <h3 className="font-medium">{user.name || user.username}</h3>
                           <p className="text-sm text-muted-foreground">
                             Member since February 2024
                           </p>
@@ -229,7 +267,7 @@ export default function ProfilePage() {
                           <FormItem>
                             <FormLabel>Full Name</FormLabel>
                             <FormControl>
-                              <Input {...field} value={field.value || ''} />
+                              <Input {...field} />
                             </FormControl>
                             <FormDescription>
                               Your full name helps personalize your experience.
@@ -246,7 +284,7 @@ export default function ProfilePage() {
                           <FormItem>
                             <FormLabel>Email</FormLabel>
                             <FormControl>
-                              <Input type="email" {...field} value={field.value || ''} />
+                              <Input type="email" {...field} />
                             </FormControl>
                             <FormDescription>
                               We'll use this for notifications and account recovery.
@@ -263,16 +301,6 @@ export default function ProfilePage() {
                           <FormItem>
                             <FormLabel>Profile Picture</FormLabel>
                             <div className="space-y-4">
-                              {field.value && (
-                                <div className="relative h-24 w-24 rounded-full overflow-hidden border border-border">
-                                  <img 
-                                    src={field.value} 
-                                    alt="Profile" 
-                                    className="object-cover w-full h-full" 
-                                  />
-                                </div>
-                              )}
-
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="relative">
                                   <Input
@@ -280,24 +308,17 @@ export default function ProfilePage() {
                                     id="profile-upload"
                                     className="absolute inset-0 opacity-0 cursor-pointer"
                                     accept="image/*"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) {
-                                        const reader = new FileReader();
-                                        reader.onload = (event) => {
-                                          field.onChange(event.target?.result);
-                                        };
-                                        reader.readAsDataURL(file);
-                                      }
-                                    }}
+                                    onChange={handleFileUpload}
+                                    disabled={isUploading}
                                   />
                                   <Button
                                     type="button"
                                     variant="outline"
                                     className="w-full"
+                                    disabled={isUploading}
                                   >
                                     <Upload className="h-4 w-4 mr-2" />
-                                    Upload Photo
+                                    {isUploading ? "Uploading..." : "Upload Photo"}
                                   </Button>
                                 </div>
 
@@ -307,6 +328,7 @@ export default function ProfilePage() {
                                   value={field.value || ''}
                                   onChange={(e) => field.onChange(e.target.value)}
                                   className="w-full"
+                                  disabled={isUploading}
                                 />
                               </div>
                             </div>
@@ -321,7 +343,7 @@ export default function ProfilePage() {
                       <Button
                         type="submit"
                         className="mr-2"
-                        disabled={updateUserMutation.isPending}
+                        disabled={updateUserMutation.isPending || isUploading}
                       >
                         {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
                       </Button>
@@ -331,7 +353,6 @@ export default function ProfilePage() {
               </Card>
             </TabsContent>
 
-            {/* Settings Tab */}
             <TabsContent value="settings">
               <Card>
                 <CardHeader>
@@ -364,10 +385,7 @@ export default function ProfilePage() {
                                   <Sun className="h-4 w-4 mr-2" />
                                   <Switch
                                     checked={field.value}
-                                    onCheckedChange={(checked) => {
-                                      field.onChange(checked);
-                                      setTheme(checked ? "dark" : "light"); // Apply theme immediately on toggle
-                                    }}
+                                    onCheckedChange={field.onChange}
                                   />
                                   <Moon className="h-4 w-4 ml-2" />
                                 </div>
@@ -404,6 +422,7 @@ export default function ProfilePage() {
                             </FormItem>
                           )}
                         />
+
                         <FormField
                           control={settingsForm.control}
                           name="pushNotifications"
@@ -457,6 +476,7 @@ export default function ProfilePage() {
                             </FormItem>
                           )}
                         />
+
                         <FormField
                           control={settingsForm.control}
                           name="autoRefreshWeather"
