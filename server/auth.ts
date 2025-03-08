@@ -1,17 +1,11 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { Express, Request, Response } from "express";
-import session from "express-session";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
-import { User as SelectUser } from "@shared/schema";
-
-declare global {
-  namespace Express {
-    interface User extends SelectUser {}
-  }
-}
+import { insertUserSchema } from "@shared/schema";
+import { z } from "zod";
 
 const scryptAsync = promisify(scrypt);
 
@@ -29,18 +23,7 @@ async function comparePasswords(supplied: string, stored: string) {
 }
 
 export function setupAuth(app: Express) {
-  const sessionSettings: session.SessionOptions = {
-    secret: process.env.SESSION_SECRET || "chers-closet-secret-key",
-    resave: false,
-    saveUninitialized: false,
-    store: storage.sessionStore,
-    cookie: {
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-    },
-  };
-
-  app.set("trust proxy", 1);
-  app.use(session(sessionSettings));
+  // Initialize Passport and restore authentication state from session
   app.use(passport.initialize());
   app.use(passport.session());
 
@@ -49,118 +32,91 @@ export function setupAuth(app: Express) {
       try {
         const user = await storage.getUserByUsername(username);
         if (!user || !(await comparePasswords(password, user.password))) {
-          return done(null, false);
-        } else {
-          return done(null, user);
+          return done(null, false, { message: "Invalid username or password" });
         }
+        return done(null, user);
       } catch (error) {
         return done(error);
       }
-    }),
+    })
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
+  passport.serializeUser((user, done) => {
+    done(null, user.id);
+  });
+
   passport.deserializeUser(async (id: number, done) => {
     try {
-      const user = await storage.getUser(id as number);
+      const user = await storage.getUser(id);
       done(null, user);
     } catch (error) {
       done(error);
     }
   });
 
-  app.post("/api/register", async (req: Request, res: Response, next) => {
+  // Auth endpoints
+  app.post("/api/auth/register", async (req: Request, res: Response) => {
     try {
-      const existingUser = await storage.getUserByUsername(req.body.username);
+      const userData = insertUserSchema.parse(req.body);
+
+      const existingUser = await storage.getUserByUsername(userData.username);
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
 
+      const hashedPassword = await hashPassword(userData.password);
       const user = await storage.createUser({
-        ...req.body,
-        password: await hashPassword(req.body.password),
+        ...userData,
+        password: hashedPassword,
       });
 
-      // Remove password from the response
-      const userResponse = { ...user } as any;
-      delete userResponse.password;
-
+      const { password, ...userWithoutPassword } = user;
       req.login(user, (err) => {
-        if (err) return next(err);
-        res.status(201).json(userResponse);
+        if (err) {
+          return res.status(500).json({ message: "Failed to login after registration" });
+        }
+        res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
-      next(error);
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Invalid registration data", errors: error.format() });
+      }
+      res.status(500).json({ message: "Failed to register user" });
     }
   });
 
-  app.post("/api/login", (req: Request, res: Response, next) => {
-    passport.authenticate("local", (err: Error, user: SelectUser, info: any) => {
-      if (err) return next(err);
-      if (!user) {
-        return res.status(401).json({ message: "Invalid username or password" });
+  app.post("/api/auth/login", (req: Request, res: Response) => {
+    passport.authenticate("local", (err, user, info) => {
+      if (err) {
+        return res.status(500).json({ message: "Internal server error" });
       }
-
-      req.login(user, (loginErr) => {
-        if (loginErr) return next(loginErr);
-
-        // Remove password from the response
-        const userResponse = { ...user } as any;
-        delete userResponse.password;
-
-        res.status(200).json(userResponse);
+      if (!user) {
+        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+      }
+      req.login(user, (err) => {
+        if (err) {
+          return res.status(500).json({ message: "Failed to login" });
+        }
+        const { password, ...userWithoutPassword } = user;
+        res.json(userWithoutPassword);
       });
-    })(req, res, next);
+    })(req, res);
   });
 
-  app.post("/api/logout", (req: Request, res: Response, next) => {
+  app.post("/api/auth/logout", (req: Request, res: Response) => {
     req.logout((err) => {
-      if (err) return next(err);
-      res.status(200).json({ message: "Logged out successfully" });
+      if (err) {
+        return res.status(500).json({ message: "Failed to logout" });
+      }
+      res.json({ message: "Logged out successfully" });
     });
   });
 
-  app.get("/api/user", (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-
-    // Remove password from the response
-    const userResponse = { ...req.user } as any;
-    delete userResponse.password;
-
-    res.json(userResponse);
-  });
-
-  app.patch("/api/user", async (req: Request, res: Response) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-
-    try {
-      // Get the current user's ID from the session
-      const userId = req.user!.id;
-
-      // Make sure to exclude any attempts to change the password directly through this endpoint
-      // Password changes should go through a separate dedicated endpoint with proper validation
-      const { password, ...updateData } = req.body;
-
-      // Update the user in the database
-      const updatedUser = await storage.updateUser(userId, updateData);
-
-      if (!updatedUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // Remove password from response for security
-      const userResponse = { ...updatedUser } as any;
-      delete userResponse.password;
-
-      // Update the session with the new user data
-      req.login(updatedUser, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Failed to update session" });
-        }
-        res.json(userResponse);
-      });
-    } catch (error) {
-      res.status(500).json({ message: "Failed to update user profile" });
+  app.get("/api/auth/me", (req: Request, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Not authenticated" });
     }
+    const { password, ...userWithoutPassword } = req.user!;
+    res.json(userWithoutPassword);
   });
 }

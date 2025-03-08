@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration - must be before routes
+// Session configuration
 app.use(
   session({
     store: storage.sessionStore,
@@ -31,6 +31,7 @@ app.use((req, res, next) => {
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
+  // Capture JSON responses for logging
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
     capturedJsonResponse = bodyJson;
@@ -44,11 +45,6 @@ app.use((req, res, next) => {
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
       }
-
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
-      }
-
       log(logLine);
     }
   });
@@ -57,9 +53,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Register routes and get HTTP server
   const server = await registerRoutes(app);
 
-  // API error handling middleware - before Vite setup
+  // API error handling middleware
   app.use("/api", (err: any, req: Request, res: Response, _next: NextFunction) => {
     console.error("API Error:", err);
     const status = err.status || err.statusCode || 500;
@@ -67,17 +64,18 @@ app.use((req, res, next) => {
     res.status(status).json({ message });
   });
 
-  // Set up Vite only for non-API routes
   if (app.get("env") === "development") {
-    app.use("/api", (req: Request, res: Response) => {
+    // Handle 404s for API routes before Vite middleware
+    app.use("/api/*", (req: Request, res: Response) => {
       res.status(404).json({ message: "API endpoint not found" });
     });
+
+    // Setup Vite for client-side routes
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // Try to serve the app on port 5000, with fallback ports
   const tryPort = (port: number) => {
     server.listen({
       port,

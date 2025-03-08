@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import express, { type Express as ExpressType } from "express";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { z } from "zod";
@@ -9,14 +10,16 @@ import {
   insertWeatherPreferenceSchema, 
   insertMoodPreferenceSchema 
 } from "@shared/schema";
-import { validLocations } from "./weather";
 
-export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup authentication routes
+// Create a router for API routes
+const apiRouter = express.Router();
+
+export async function registerRoutes(app: ExpressType): Promise<Server> {
+  // Setup authentication first
   setupAuth(app);
 
   // Wardrobe routes
-  app.get("/api/wardrobe", async (req: Request, res: Response) => {
+  apiRouter.get("/wardrobe", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -27,7 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/wardrobe", async (req: Request, res: Response) => {
+  apiRouter.post("/wardrobe", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -46,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/wardrobe/:id", async (req: Request, res: Response) => {
+  apiRouter.get("/wardrobe/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -67,7 +70,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/wardrobe/:id", async (req: Request, res: Response) => {
+  apiRouter.patch("/wardrobe/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -89,7 +92,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/wardrobe/:id", async (req: Request, res: Response) => {
+  apiRouter.delete("/wardrobe/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -112,7 +115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Outfit routes
-  app.get("/api/outfits", async (req: Request, res: Response) => {
+  apiRouter.get("/outfits", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -123,7 +126,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/outfits", async (req: Request, res: Response) => {
+  apiRouter.post("/outfits", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -142,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/outfits/:id", async (req: Request, res: Response) => {
+  apiRouter.get("/outfits/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -163,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/outfits/:id", async (req: Request, res: Response) => {
+  apiRouter.patch("/outfits/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -185,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/outfits/:id", async (req: Request, res: Response) => {
+  apiRouter.delete("/outfits/:id", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -208,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Inspiration routes
-  app.get("/api/inspirations", async (req: Request, res: Response) => {
+  apiRouter.get("/inspirations", async (req, res) => {
     try {
       const inspirations = await storage.getInspirations();
       res.json(inspirations);
@@ -217,7 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/inspirations/:id", async (req: Request, res: Response) => {
+  apiRouter.get("/inspirations/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const inspiration = await storage.getInspiration(id);
@@ -233,7 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Weather preferences routes
-  app.get("/api/weather-preferences", async (req: Request, res: Response) => {
+  apiRouter.get("/weather-preferences", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -244,7 +247,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/weather-preferences", async (req: Request, res: Response) => {
+  apiRouter.post("/weather-preferences", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -264,7 +267,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mood preferences routes
-  app.get("/api/mood-preferences", async (req: Request, res: Response) => {
+  apiRouter.get("/mood-preferences", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -275,7 +278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/mood-preferences", async (req: Request, res: Response) => {
+  apiRouter.post("/mood-preferences", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
 
     try {
@@ -295,7 +298,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Weather API route - enhanced mock implementation
-  app.get("/api/weather", (req: Request, res: Response) => {
+  apiRouter.get("/weather", (req, res) => {
     console.log("Fetching weather for location:", req.query.location);
     
     // Get location from query parameter, defaulting to New York City
@@ -335,7 +338,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Weather suggestions API endpoint
-  app.get("/api/weather-suggestions", async (req: Request, res: Response) => {
+  apiRouter.get("/weather-suggestions", async (req, res) => {
     const query = (req.query.q as string || "").toLowerCase();
 
     if (!query || query.length < 2) {
@@ -350,6 +353,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(suggestions);
   });
 
+  // Mount the API router under /api
+  app.use("/api", apiRouter);
+
+  // Create and return the HTTP server
   const httpServer = createServer(app);
   return httpServer;
 }
