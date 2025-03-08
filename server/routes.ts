@@ -9,6 +9,7 @@ import {
   insertWeatherPreferenceSchema, 
   insertMoodPreferenceSchema 
 } from "@shared/schema";
+import { validLocations } from "./weather";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes
@@ -336,22 +337,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Weather suggestions API endpoint
   app.get("/api/weather-suggestions", async (req: Request, res: Response) => {
     const query = (req.query.q as string || "").toLowerCase();
-    
+
     if (!query || query.length < 2) {
       return res.json([]);
     }
-    
-    // Filter the valid locations from weather.ts
-    import("./weather").then(({ validLocations }) => {
-      const suggestions = validLocations
-        .filter(location => location.toLowerCase().includes(query))
-        .slice(0, 10);
-      
-      res.json(suggestions);
-    }).catch(error => {
-      console.error("Error fetching location suggestions:", error);
-      res.status(500).json({ error: "Failed to fetch location suggestions" });
-    });
+
+    // Filter the valid locations
+    const suggestions = validLocations
+      .filter((location: string) => location.toLowerCase().includes(query))
+      .slice(0, 10);
+
+    res.json(suggestions);
   });
 
   const httpServer = createServer(app);

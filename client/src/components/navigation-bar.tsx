@@ -3,14 +3,14 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useTheme } from "@/hooks/use-theme";
 import { Button } from "@/components/ui/button";
-import { 
-  Sun, 
-  Moon, 
-  Home, 
-  Shirt, 
-  CloudSun, 
-  Sparkles, 
-  User, 
+import {
+  Sun,
+  Moon,
+  Home,
+  Shirt,
+  CloudSun,
+  Sparkles,
+  User,
   LogOut,
   Layers
 } from "lucide-react";
@@ -18,14 +18,14 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const NavigationBar: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const { theme, setTheme } = useTheme();
   const [location] = useLocation();
 
   const navItems = [
     { path: "/", icon: <Home className="h-5 w-5" />, label: "Home" },
     { path: "/wardrobe", icon: <Shirt className="h-5 w-5" />, label: "Wardrobe" },
-    { path: "/outfits", icon: <Layers className="h-5 w-5" />, label: "Outfits" }, // Added Outfits section
+    { path: "/outfits", icon: <Layers className="h-5 w-5" />, label: "Outfits" },
     { path: "/inspirations", icon: <Sparkles className="h-5 w-5" />, label: "Inspirations" },
     { path: "/profile", icon: <User className="h-5 w-5" />, label: "Profile" },
   ];
@@ -43,13 +43,17 @@ const NavigationBar: React.FC = () => {
           return "from-amber-500 to-pink-500";
         case "/profile":
           return "from-indigo-500 to-pink-500";
-        case "/outfits": // Added case for Outfits
-          return "from-green-500 to-teal-500"; // Added gradient for Outfits
+        case "/outfits":
+          return "from-green-500 to-teal-500";
         default:
           return "from-primary to-secondary";
       }
     }
     return "from-muted to-muted";
+  };
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
   };
 
   return (
@@ -117,8 +121,9 @@ const NavigationBar: React.FC = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => logout()}
+              onClick={handleLogout}
               aria-label="Logout"
+              disabled={logoutMutation.isPending}
             >
               <LogOut className="h-5 w-5" />
             </Button>
