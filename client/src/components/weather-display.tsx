@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { 
   CloudSun, 
   CloudRain, 
@@ -57,13 +57,20 @@ export default function WeatherDisplay({ weather, recommendations, hideLocation 
         transition={{ delay: 0.2 }}
       >
         <div className="flex items-center">
-          {getWeatherIcon(weather.icon)}
+          <motion.div
+            initial={{ scale: 0.8, rotate: -10 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 200 }}
+            className="hover-scale"
+          >
+            {getWeatherIcon(weather.icon)}
+          </motion.div>
           <div className="ml-3">
             {!hideLocation && (
               <motion.h3 
                 className="text-xl font-bold"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
               >
                 {weather.location.split(' ')[0]}
@@ -93,39 +100,60 @@ export default function WeatherDisplay({ weather, recommendations, hideLocation 
           animate={{ opacity: 1, x: 0 }}
           transition={{ delay: 0.5 }}
         >
-          <div className="flex items-center">
+          <motion.div 
+            className="flex items-center hover-scale"
+            whileHover={{ scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 400 }}
+          >
             <Thermometer className="h-4 w-4 mr-1 text-orange-500" />
             <span className="text-sm">Humidity: {weather.humidity}%</span>
-          </div>
-          <div className="flex items-center">
+          </motion.div>
+          <motion.div 
+            className="flex items-center hover-scale"
+            whileHover={{ scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 400 }}
+          >
             <Wind className="h-4 w-4 mr-1 text-blue-500" />
             <span className="text-sm">Wind: {weather.windSpeed} km/h</span>
-          </div>
+          </motion.div>
         </motion.div>
       </motion.div>
 
       {recommendations && recommendations.length > 0 && (
         <motion.div 
-          className="mt-4"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
+          className="mt-4 overflow-hidden"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          transition={{ duration: 0.5, delay: 0.2 }}
         >
           <h4 className="text-sm font-medium mb-2">Recommendations:</h4>
-          <div className="flex flex-wrap gap-2">
-            {recommendations.map((recommendation, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.7 + index * 0.1 }}
-              >
-                <Badge variant="secondary" className="bg-primary/10 hover:bg-primary/20 text-primary">
-                  {recommendation}
-                </Badge>
-              </motion.div>
-            ))}
-          </div>
+          <motion.div 
+            className="flex flex-wrap gap-2 max-h-32 overflow-y-auto scrollbar-thin fade-edge-mask pr-2"
+          >
+            <AnimatePresence>
+              {recommendations.map((recommendation, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, y: -20 }}
+                  transition={{ 
+                    delay: index * 0.1,
+                    type: "spring",
+                    stiffness: 200
+                  }}
+                  className="hover-scale"
+                >
+                  <Badge 
+                    variant="secondary" 
+                    className="bg-primary/10 hover:bg-primary/20 text-primary transition-colors duration-200"
+                  >
+                    {recommendation}
+                  </Badge>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </motion.div>
         </motion.div>
       )}
     </motion.div>
