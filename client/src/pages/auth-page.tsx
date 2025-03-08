@@ -8,7 +8,7 @@ import { insertUserSchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2 } from "lucide-react";
 
@@ -47,7 +47,7 @@ type RegisterValues = z.infer<typeof registerSchema>;
 
 export default function AuthPage() {
   const [location, navigate] = useLocation();
-  const { user, loginMutation, registerMutation, isLoading } = useAuth();
+  const { user, loginMutation, registerMutation } = useAuth();
 
   // Redirect if already logged in
   useEffect(() => {
@@ -83,6 +83,8 @@ export default function AuthPage() {
     const { confirmPassword, ...userData } = values;
     registerMutation.mutate(userData);
   }
+
+  const isLoading = loginMutation.isPending || registerMutation.isPending;
 
   return (
     <div className="min-h-screen grid md:grid-cols-2 bg-background">
@@ -204,9 +206,9 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={loginMutation.isPending}
+                      disabled={isLoading}
                     >
-                      {loginMutation.isPending ? (
+                      {isLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Logging in...
@@ -294,9 +296,9 @@ export default function AuthPage() {
                     <Button
                       type="submit"
                       className="w-full"
-                      disabled={registerMutation.isPending}
+                      disabled={isLoading}
                     >
-                      {registerMutation.isPending ? (
+                      {isLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Creating account...

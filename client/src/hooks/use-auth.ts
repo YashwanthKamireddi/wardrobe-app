@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
+import { type InsertUser } from "@shared/schema";
 
 interface User {
   id: number;
@@ -15,118 +16,125 @@ interface AuthStore {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  setUser: (user: User | null) => void;
 }
 
 // Create auth store using Zustand
 const useAuthStore = create<AuthStore>((set) => ({
   user: null,
-  isLoading: true,
+  isLoading: false,
   isAuthenticated: false,
-
-  login: async (username: string, password: string) => {
-    try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (response.ok) {
-        const user = await response.json();
-        set({ user, isAuthenticated: true });
-      } else {
-        const error = await response.json();
-        throw new Error(error.message || "Login failed");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to login",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  },
-
-  logout: async () => {
-    try {
-      const response = await fetch("/api/auth/logout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (response.ok) {
-        set({ user: null, isAuthenticated: false });
-      } else {
-        throw new Error("Logout failed");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to logout",
-        variant: "destructive",
-      });
-      throw error;
-    }
-  },
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
 }));
 
 // Hook for managing auth state and mutations
 export function useAuth() {
   const queryClient = useQueryClient();
-  const authStore = useAuthStore();
+  const { user, setUser, isAuthenticated } = useAuthStore();
 
   // Query for current user
-  const { data: user, isLoading } = useQuery({
+  const { data: currentUser, isLoading } = useQuery({
     queryKey: ["/api/auth/me"],
     retry: false,
   });
 
-  // Mutation for updating user
-  const updateUserMutation = useMutation({
-    mutationFn: async (data: Partial<User>) => {
-      const response = await fetch("/api/auth/update", {
-        method: "PATCH",
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: { username: string; password: string }) => {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(credentials),
       });
-      if (!response.ok) throw new Error("Failed to update user");
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Login failed");
+      }
+
       return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    onSuccess: (data) => {
+      setUser(data);
+      queryClient.setQueryData(["/api/auth/me"], data);
       toast({
         title: "Success",
-        description: "Profile updated successfully",
+        description: "Logged in successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to login",
+        variant: "destructive",
       });
     },
   });
 
-  // Mutation for logout
+  // Register mutation
+  const registerMutation = useMutation({
+    mutationFn: async (userData: Omit<InsertUser, "password"> & { password: string }) => {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Registration failed");
+      }
+
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setUser(data);
+      queryClient.setQueryData(["/api/auth/me"], data);
+      toast({
+        title: "Success",
+        description: "Account created successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create account",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
       const response = await fetch("/api/auth/logout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+
       if (!response.ok) throw new Error("Failed to logout");
       return response.json();
     },
     onSuccess: () => {
+      setUser(null);
       queryClient.clear();
       window.location.href = "/auth";
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: "Failed to logout",
+        variant: "destructive",
+      });
     },
   });
 
   return {
-    user: user || authStore.user,
+    user: currentUser || user,
     isLoading,
-    isAuthenticated: !!user || authStore.isAuthenticated,
-    updateUserMutation,
+    isAuthenticated: !!currentUser || isAuthenticated,
+    loginMutation,
+    registerMutation,
     logoutMutation,
-    login: authStore.login,
-    logout: authStore.logout,
   };
 }
