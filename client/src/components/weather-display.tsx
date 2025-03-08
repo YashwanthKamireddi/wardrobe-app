@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
 import { 
   CloudSun, 
   CloudRain, 
@@ -25,8 +26,6 @@ interface WeatherDisplayProps {
 }
 
 export default function WeatherDisplay({ weather, recommendations }: WeatherDisplayProps) {
-  console.log("Rendering WeatherDisplay with:", weather);
-
   const getWeatherIcon = (icon: string) => {
     switch (icon) {
       case 'sunny':
@@ -44,18 +43,57 @@ export default function WeatherDisplay({ weather, recommendations }: WeatherDisp
     }
   };
 
+  // Extract the base location name without the emoji
+  const locationName = weather.location.split(' ')[0];
+
   return (
-    <div className="space-y-4">
+    <motion.div 
+      className="space-y-4"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+    >
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-        <div className="flex items-center">
+        <motion.div 
+          className="flex items-center"
+          initial={{ scale: 0.9 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 0.3 }}
+        >
           {getWeatherIcon(weather.icon)}
           <div className="ml-3">
-            <h3 className="text-xl font-bold">{weather.location}</h3>
-            <p className="text-2xl font-semibold">{weather.temperature}°C</p>
-            <p className="text-sm text-muted-foreground">{weather.condition}</p>
+            <motion.h3 
+              className="text-xl font-bold"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              {locationName}
+            </motion.h3>
+            <motion.p 
+              className="text-2xl font-semibold"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              {weather.temperature}°C
+            </motion.p>
+            <motion.p 
+              className="text-sm text-muted-foreground"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+            >
+              {weather.condition}
+            </motion.p>
           </div>
-        </div>
-        <div className="mt-4 sm:mt-0 grid grid-cols-2 gap-3">
+        </motion.div>
+        <motion.div 
+          className="mt-4 sm:mt-0 grid grid-cols-2 gap-3"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.5 }}
+        >
           <div className="flex items-center">
             <Thermometer className="h-4 w-4 mr-1 text-orange-500" />
             <span className="text-sm">Humidity: {weather.humidity}%</span>
@@ -64,21 +102,33 @@ export default function WeatherDisplay({ weather, recommendations }: WeatherDisp
             <Wind className="h-4 w-4 mr-1 text-blue-500" />
             <span className="text-sm">Wind: {weather.windSpeed} km/h</span>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {recommendations && recommendations.length > 0 && (
-        <div className="mt-4">
+        <motion.div 
+          className="mt-4"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
           <h4 className="text-sm font-medium mb-2">Recommendations:</h4>
           <div className="flex flex-wrap gap-2">
             {recommendations.map((recommendation, index) => (
-              <Badge key={index} variant="secondary" className="bg-primary/10 hover:bg-primary/20 text-primary">
-                {recommendation}
-              </Badge>
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.7 + index * 0.1 }}
+              >
+                <Badge variant="secondary" className="bg-primary/10 hover:bg-primary/20 text-primary">
+                  {recommendation}
+                </Badge>
+              </motion.div>
             ))}
           </div>
-        </div>
+        </motion.div>
       )}
-    </div>
+    </motion.div>
   );
 }
